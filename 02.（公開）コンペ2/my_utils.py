@@ -5,7 +5,7 @@ import datetime
 from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
@@ -41,6 +41,8 @@ class MyUtils:
         self.input_path = input_path
         self.output_path = output_path
         self.exel_path = exel_path
+        self.train = None
+        self.test = None
     
     def get_output_path(self):
         return self.output_path
@@ -58,6 +60,8 @@ class MyUtils:
         sample_sub = pd.read_csv(self.input_path + "sample_submission.csv")
         X_train = train.drop('TARGET',axis=1)
         y_train = train['TARGET']
+        self.train = train
+        self.test = test
         return train, test, X_train, y_train, sample_sub
     
     def split_data(self, train, test):
@@ -114,7 +118,12 @@ class MyUtils:
             data[column+'_bin_by_year'] = np.floor(data[column]/365)
         return data
 
-    # 欠損値の確認
+    # 欠損値のあるカラムの確認
+    def missing_columns(self,):
+        missing_columns = self.train.columns[self.train.isnull().sum() > 0]
+        return missing_columns
+
+    # 欠損値の詳細確認
     def missing_data(self, data):
         total = data.isnull().sum().sort_values(ascending = False)
         percent = (data.isnull().sum()/data.isnull().count()*100).sort_values(ascending = False)
@@ -135,21 +144,22 @@ class MyUtils:
         return datetime.datetime.now().strftime('%Y%m%d%H%M')
     
     # 複数のモデルで予測を行い、精度の違いを確認する関数
-    def multi_model_predict(self, X_train, y_train, X_valid, y_valid, hasNan):
-        if hasNan==True:
-            models = [
+    def multi_model_predict(self, X_train, y_train, X_valid, y_valid, all=False):
+        
+        nan_useable_models = [
                 ('gbc', GradientBoostingClassifier()),  
                 ('lgbm', lgb.LGBMClassifier(verbose=-1)),
                 ('xgb', xgb.XGBClassifier()),
                 ('cat', cat.CatBoostClassifier()),
                 ('rf', RandomForestClassifier()),
-
             ]
-        else:
+        
+        # 欠損値がなければ、modelsでも学習を行う
+        if all == True:
             models = [
                 ('lr', LogisticRegression()),
                 ('knn', KNeighborsClassifier()),
-                ('svc', SVC(probability=True)),
+                # ('svc', SVC(probability=True)), # サポートベクターマシンは時間がかかるためコメントアウト
                 ('nb', GaussianNB()),
                 ('ada', AdaBoostClassifier()),
                 ('dt', DecisionTreeClassifier()),
@@ -158,22 +168,30 @@ class MyUtils:
             scaler = StandardScaler()
             X_train = scaler.fit_transform(X_train)
             X_valid = scaler.transform(X_valid)
+            for name, model in models:
+                print(f'{model}_start')
+                model.fit(X_train, y_train)
+                y_pred_train = model.predict_proba(X_train)[:, 1]
+                y_pred_valid = model.predict_proba(X_valid)[:, 1]
+                print(f'{name} Train Score: {roc_auc_score(y_train, y_pred_train)}')
+                print(f'{name} Valid Score: {roc_auc_score(y_valid, y_pred_valid)}')
 
-        for name, model in models:
+        for name, model in nan_useable_models:
             print(f'{model}_start')
             model.fit(X_train, y_train)
             y_pred_train = model.predict_proba(X_train)[:, 1]
             y_pred_valid = model.predict_proba(X_valid)[:, 1]
-            
-
             print(f'{name} Train Score: {roc_auc_score(y_train, y_pred_train)}')
             print(f'{name} Valid Score: {roc_auc_score(y_valid, y_pred_valid)}')
-
+        
     # 外れ値の除去 標準偏差の3倍以上の値を除去
-    def remove_outliers(self, data, columns):
+    def remove_outliers(self, train, columns):
         for column in columns:
-            data = data[np.abs(data[column] - data[column].mean()) <= (3 * data[column].std())]
-        return data
+            # nanではないデータに対して、平均値±3σ以外のデータを除去
+            train.drop(train[np.abs(train[column]  > train[column].quantile(0.96))],axis=1)
+            print(f"{column}_{train[column].shape}")
+            print(f"外れ値：{train[column][np.abs(train[column] >= ( train[column].quantile(0.96)))]}")
+        return train
 
     # 標準化
     def standard_scaler(self, X_train, X_valid, X_test):
@@ -183,7 +201,7 @@ class MyUtils:
         X_test = scaler.transform(X_test)
         return X_train, X_valid, X_test
         
-    # 欠損値に対してターゲットエンコーディング use leave one out
+    # 欠損値に対してターゲットエンコーディング Holdout Target Encoding https://www.codexa.net/target_encoding/
     def target_encoding(self, X, Y, columns):
         for column in columns:
             target_mean = Y[column].mean()
@@ -191,3 +209,32 @@ class MyUtils:
             if X[column].isnull().sum() > 0:
                 X[column].fillna(Y.mean(), inplace=True)
         return X, Y
+    
+    # カテゴリカルデータをターゲットエンコーディング Holdout Target Encoding https://www.codexa.net/target_encoding/
+    def target_encoding(self, X, Y, columns, random_state=0):
+        kf = KFold(n_splits=5, shuffle=True, random_state=random_state) # type: ignore
+        for column in columns:
+            x_box = np.zeros(len(X))
+            x_box[:] = np.nan
+            for train_idx, valid_idx in kf.split(X):
+                train = X[[column, "TARGET"]].iloc[train_idx]
+                valid = X[column].iloc[valid_idx]
+                mean = train.groupby(column)["TARGET"].mean().to_frame()
+                for i , m in mean.iterrows(): # i = name, m = value
+                    # print(f"name {i}, itmes{m}")
+                    # print(m.values)
+                    for v in valid.index:
+                        if valid[v] == i: 
+                            x_box[v] = m.values
+                    
+            X[column] = x_box
+            # Yも同様に埋める
+            y_box = np.zeros(len(Y))
+            y_box[:] = np.nan
+            maen = X.groupby(column)["TARGET"].mean().to_frame()
+            for i , m in mean.iterrows():
+                for v in range(len(Y)):
+                    if Y[column][v] == i:
+                        y_box[v] = m.values   
+            Y[column] = y_box
+        return X ,Y
