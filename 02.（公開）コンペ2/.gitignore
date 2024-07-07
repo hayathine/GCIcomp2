@@ -3,3 +3,4 @@
 *.html
 *.xlsx
 *.pyc
+/notebooks/catboost_info/

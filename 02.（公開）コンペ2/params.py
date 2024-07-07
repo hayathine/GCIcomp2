@@ -7,28 +7,31 @@ class Params:
     'verbosity': -1,
     'boosting_type': 'gbdt',
     'num_leaves': hp.randint('num_leaves',2, 100),
-    'max_depth': hp.randint('max_depth',2, 3),
     'n_estimators': hp.randint('n_estimators',800, 2000),
     'learning_rate': hp.uniform('learning_rate', 0.005 ,0.2),
-    # 'min_child_samples': hp.randint('min_child_samples',5, 10),
+    'min_child_samples': hp.randint('min_child_samples',5, 10),
     'reg_lamb': hp.uniform('reg_lamb', 0, 40),
     'bagging_freq': hp.randint('bagging_freq', 1, 10),
     'bagging_fraction': hp.uniform('bagging_fraction', 0.8, 1),
     'feature_fraction': hp.uniform('feature_fraction', 0.1, 1),
     'min_data_in_leaf': hp.randint('min_data_in_leaf', 10, 100),
-    'sub_sample': hp.uniform('sub_sample', 0.1, 1),
+    # 'sub_sample_freq': hp.randint('sub_sample_freq', 10, 50),
+    # 'sub_sample': hp.uniform('sub_sample', 0.1, 0.5),
     }
 
     # https://qiita.com/c60evaporator/items/a9a049c3469f6b4872c6
     xgb = {
         'subsample': hp.uniform('subsample', 0.0, 1),
         'n_estimators': hp.randint('n_estimators', 800, 1200),
+        # 'n_estimators': 10000,
         'max_depth': hp.randint('max_depth', 2, 5),
         'learning_rate': hp.uniform('learning_rate', 0.005, 0.2),
         'eta': hp.uniform('eta', 0.005, 0.2),
         'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 1),
         'colsample_bylevel': hp.uniform('colsample_bylevel', 0.6, 1),
         'reg_alpha': hp.uniform('reg_alpha', 0, 40),
+        # 'sub_sample_freq': hp.randint('sub_sample_freq', 10, 50),
+        
         'gamma': hp.uniform('gamma', 0, 40),
         'min_child_weight': hp.uniform('min_child_weight', 1, 10),
     }
@@ -39,4 +42,10 @@ class Params:
     'solver': hp.choice('solver', [ 'lbfgs', 'sag', 'saga']),
     'C': hp.uniform('C', 0.1, 1),
     'penalty': hp.choice('penalty', ['l2']),
+    }
+
+    cat = {
+        'num_boost_round': hp.randint('num_boost_round', 1000, 2000),
+        'learning_rate': hp.uniform('learning_rate', 0.005, 0.2),
+        'depth': hp.randint('depth', 2, 10),
     }

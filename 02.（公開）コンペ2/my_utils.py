@@ -15,6 +15,8 @@ from sklearn.ensemble import RandomForestClassifier
 import lightgbm as lgb
 import xgboost as xgb
 import catboost as cat
+from typing import List
+import pickle
 
 from hyperopt import hp
 
@@ -63,6 +65,12 @@ class MyUtils:
         # 訓練データと評価データに分割
         X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.3, stratify=y, random_state=0)
         return X_train, X_valid, y_train, y_valid, X, y
+    
+    # pickleファイルにListを保存
+    def save_pickle(self, data: List, file_name):
+        with open(self.output_path + file_name + '.pickle', 'wb') as f:
+            pickle.dump(data, f)
+
     
     # exel表にparameter,scoreを記録する関数
     def save_score_to_exel(self, exel_path , best: dict, score, time):
@@ -127,6 +135,13 @@ class MyUtils:
                     verbose=0,
                 )),
                 ('rf', RandomForestClassifier(
+                    n_estimators=1000,
+                    max_depth=2,
+                    random_state=0,
+                    min_samples_split=5,
+                    
+                    verbose=0
+
 
                 )),
             ]

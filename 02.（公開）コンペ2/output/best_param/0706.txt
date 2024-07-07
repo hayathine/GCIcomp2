@@ -1,0 +1,20 @@
+{'bagging_fraction': 0.8039293504852701, 
+'bagging_freq': 2, '
+feature_fraction': 0.37836909844352534, 
+'learning_rate': 0.15082531821160483, 
+'max_depth': 2, 
+'min_data_in_leaf': 57, 
+'n_estimators': 1767, 
+'num_leaves': 99, 
+'reg_lamb': 32.118557974007416, 
+'sub_sample': 0.8461398207108197}
+{'colsample_bylevel': 0.8630745176584004, 
+'colsample_bytree': 0.6116561762324111, 
+'eta': 0.12341365770958973,
+ 'gamma': 0.11789788818008884, 
+ 'learning_rate': 0.18734280147773744,
+  'max_depth': 2, 
+  'min_child_weight': 3.4696476025015652, 
+  'n_estimators': 1004, 
+  'reg_alpha': 5.103374478260624, 
+  'subsample': 0.973177986215385}
